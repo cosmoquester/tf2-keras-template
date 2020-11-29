@@ -8,5 +8,7 @@ def get_dataset(dataset_file_path: str):
     :param dataset_file_path: dataset file path.
     """
     # Replace the context of this function
-    dataset = tf.data.Dataset.from_tensor_slices([1, 2, 3, 4, 5])
-    return dataset
+    dataset_x = tf.data.Dataset.range(10000)
+    dataset_y = tf.data.Dataset.from_tensor_slices([0, 1] * 5000)
+
+    return tf.data.Dataset.zip((dataset_x, dataset_y))

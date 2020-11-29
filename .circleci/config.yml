@@ -63,8 +63,8 @@ jobs:
           name: Run black, isort
           command: |
             source env/bin/activate
-            black --check sample_package tests
-            isort sample_package tests
+            black --check sample_package scripts tests
+            isort sample_package scripts tests
 
 workflows:
   main:
