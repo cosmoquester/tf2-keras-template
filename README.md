@@ -1,6 +1,6 @@
-# Python Project Setup
+# Tensorflow2 Project Setup
 
-- This repository is template for my python project
+- This repository is template for my tensorflow keras project
 
 ## Things to be changed
 
