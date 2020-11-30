@@ -9,7 +9,7 @@ import tensorflow as tf
 
 from sample_package.data import get_dataset
 from sample_package.model import SampleModel
-from sample_package.utils import learning_rate_scheduler
+from sample_package.utils import get_logger, learning_rate_scheduler
 
 # fmt: off
 parser = argparse.ArgumentParser()
@@ -32,10 +32,12 @@ parser.add_argument("--disable-mixed-precision", action="store_false", dest="mix
 if __name__ == "__main__":
     args = parser.parse_args()
 
+    logger = get_logger()
+
     if args.mixed_precision:
         policy = tf.keras.mixed_precision.experimental.Policy("mixed_float16")
         tf.keras.mixed_precision.experimental.set_policy(policy)
-        print("Use Mixed Precision FP16")
+        logger.info("Use Mixed Precision FP16")
 
     # Copy config file
     os.makedirs(args.output_path)
@@ -47,7 +49,7 @@ if __name__ == "__main__":
     # Construct Dataset
     dataset_files = glob.glob(args.dataset_path)
     if not dataset_files:
-        print("[Error] Dataset path is invalid!", file=sys.stderr)
+        logger.error("[Error] Dataset path is invalid!")
         sys.exit(1)
 
     dataset = get_dataset(dataset_files).shuffle(args.shuffle_buffer_size)
@@ -56,7 +58,7 @@ if __name__ == "__main__":
 
     if args.steps_per_epoch:
         train_dataset.repeat()
-        print("Repeat dataset")
+        logger.info("Repeat dataset")
 
     # Model Initialize
     with open(args.model_config_path) as f:
@@ -65,7 +67,7 @@ if __name__ == "__main__":
     # Load pretrained model
     if args.pretrained_model_path:
         model.load_weights(args.pretrained_model_path)
-        print("Loaded weights of model")
+        logger.info("Loaded weights of model")
 
     # Model Compile
     model.compile(
@@ -73,6 +75,8 @@ if __name__ == "__main__":
         loss=tf.keras.losses.BinaryCrossentropy(),
         metrics=[tf.keras.metrics.BinaryAccuracy()],
     )
+    logger.info("Model compiling complete")
+    logger.info("Start training")
 
     # Training
     model.fit(
