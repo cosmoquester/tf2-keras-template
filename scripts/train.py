@@ -1,15 +1,12 @@
 import argparse
-import glob
 import json
-import os
-import shutil
 import sys
 
 import tensorflow as tf
 
 from sample_package.data import get_dataset
 from sample_package.model import SampleModel
-from sample_package.utils import get_logger, learning_rate_scheduler
+from sample_package.utils import get_device_strategy, get_logger, learning_rate_scheduler, path_join
 
 # fmt: off
 parser = argparse.ArgumentParser()
@@ -27,6 +24,7 @@ parser.add_argument("--dev-batch-size", type=int, default=2)
 parser.add_argument("--num-dev-dataset", type=int, default=2)
 parser.add_argument("--tensorboard-update-freq", type=int, default=1)
 parser.add_argument("--disable-mixed-precision", action="store_false", dest="mixed_precision", help="Use mixed precision FP16")
+parser.add_argument("--device", type=str, default="CPU", help="device to use (TPU or GPU or CPU)")
 # fmt: on
 
 if __name__ == "__main__":
@@ -40,65 +38,66 @@ if __name__ == "__main__":
         logger.info("Use Mixed Precision FP16")
 
     # Copy config file
-    os.makedirs(args.output_path)
-    with open(os.path.join(args.output_path, "argument_configs.txt"), "w") as fout:
+    tf.io.gfile.makedirs(args.output_path)
+    with tf.io.gfile.GFile(path_join(args.output_path, "argument_configs.txt"), "w") as fout:
         for k, v in vars(args).items():
             fout.write(f"{k}: {v}\n")
-    shutil.copy(args.model_config_path, args.output_path)
+    tf.io.gfile.copy(args.model_config_path, path_join(args.output_path, "model_config.json"))
 
     # Construct Dataset
-    dataset_files = glob.glob(args.dataset_path)
+    dataset_files = tf.io.gfile.glob(args.dataset_path)
     if not dataset_files:
         logger.error("[Error] Dataset path is invalid!")
         sys.exit(1)
 
-    dataset = get_dataset(dataset_files).shuffle(args.shuffle_buffer_size)
-    train_dataset = dataset.skip(args.num_dev_dataset).batch(args.batch_size)
-    dev_dataset = dataset.take(args.num_dev_dataset).batch(max(args.batch_size, args.dev_batch_size))
+    with get_device_strategy(args.device).scope():
+        dataset = get_dataset(dataset_files).shuffle(args.shuffle_buffer_size)
+        train_dataset = dataset.skip(args.num_dev_dataset).batch(args.batch_size)
+        dev_dataset = dataset.take(args.num_dev_dataset).batch(max(args.batch_size, args.dev_batch_size))
 
-    if args.steps_per_epoch:
-        train_dataset.repeat()
-        logger.info("Repeat dataset")
+        if args.steps_per_epoch:
+            train_dataset.repeat()
+            logger.info("Repeat dataset")
 
-    # Model Initialize
-    with open(args.model_config_path) as f:
-        model = SampleModel(**json.load(f))
+        # Model Initialize
+        with tf.io.gfile.GFile(args.model_config_path) as f:
+            model = SampleModel(**json.load(f))
 
-    # Load pretrained model
-    if args.pretrained_model_path:
-        model.load_weights(args.pretrained_model_path)
-        logger.info("Loaded weights of model")
+        # Load pretrained model
+        if args.pretrained_model_path:
+            model.load_weights(args.pretrained_model_path)
+            logger.info("Loaded weights of model")
 
-    # Model Compile
-    model.compile(
-        optimizer=tf.optimizers.Adam(args.learning_rate),
-        loss=tf.keras.losses.BinaryCrossentropy(),
-        metrics=[tf.keras.metrics.BinaryAccuracy()],
-    )
-    logger.info("Model compiling complete")
-    logger.info("Start training")
+        # Model Compile
+        model.compile(
+            optimizer=tf.optimizers.Adam(args.learning_rate),
+            loss=tf.keras.losses.BinaryCrossentropy(),
+            metrics=[tf.keras.metrics.BinaryAccuracy()],
+        )
+        logger.info("Model compiling complete")
+        logger.info("Start training")
 
-    # Training
-    model.fit(
-        train_dataset,
-        validation_data=dev_dataset,
-        epochs=args.epochs,
-        steps_per_epoch=args.steps_per_epoch,
-        callbacks=[
-            tf.keras.callbacks.ModelCheckpoint(
-                os.path.join(
-                    args.output_path,
-                    "models",
-                    "model-{epoch}epoch-{val_loss:.4f}loss_{val_binary_accuracy:.4f}acc.ckpt",
+        # Training
+        model.fit(
+            train_dataset,
+            validation_data=dev_dataset,
+            epochs=args.epochs,
+            steps_per_epoch=args.steps_per_epoch,
+            callbacks=[
+                tf.keras.callbacks.ModelCheckpoint(
+                    path_join(
+                        args.output_path,
+                        "models",
+                        "model-{epoch}epoch-{val_loss:.4f}loss_{val_binary_accuracy:.4f}acc.ckpt",
+                    ),
+                    save_weights_only=True,
+                    verbose=1,
                 ),
-                save_weights_only=True,
-                verbose=1,
-            ),
-            tf.keras.callbacks.TensorBoard(
-                os.path.join(args.output_path, "logs"), update_freq=args.tensorboard_update_freq
-            ),
-            tf.keras.callbacks.LearningRateScheduler(
-                learning_rate_scheduler(args.epochs, args.learning_rate, args.min_learning_rate), verbose=1
-            ),
-        ],
-    )
+                tf.keras.callbacks.TensorBoard(
+                    path_join(args.output_path, "logs"), update_freq=args.tensorboard_update_freq
+                ),
+                tf.keras.callbacks.LearningRateScheduler(
+                    learning_rate_scheduler(args.epochs, args.learning_rate, args.min_learning_rate), verbose=1
+                ),
+            ],
+        )
