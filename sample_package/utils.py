@@ -12,7 +12,7 @@ def learning_rate_scheduler(num_epochs: int, max_learning_rate: float, min_learn
     lr_delta = (max_learning_rate - min_learninga_rate) / num_epochs
 
     def _scheduler(epoch: int, lr: float) -> float:
-        return lr - lr_delta
+        return max_learning_rate - lr_delta * epoch
 
     return _scheduler
 
@@ -30,7 +30,7 @@ def get_logger() -> logging.Logger:
 def path_join(*paths: Iterable[str]) -> str:
     """ Join paths to string local paths and google storage paths also """
     if paths[0].startswith("gs://"):
-        return "/".join([path.strip("/") for path in paths])
+        return "/".join((path.strip("/") for path in paths))
     return os.path.join(*paths)
 
 
