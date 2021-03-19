@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from sample_package.data import get_dataset
 from sample_package.model import SampleModel
-from sample_package.utils import get_device_strategy, get_logger, learning_rate_scheduler, path_join
+from sample_package.utils import get_device_strategy, get_logger, learning_rate_scheduler, path_join, set_random_seed
 
 # fmt: off
 parser = argparse.ArgumentParser()
@@ -24,6 +24,7 @@ parser.add_argument("--dev-batch-size", type=int, default=2)
 parser.add_argument("--num-dev-dataset", type=int, default=2)
 parser.add_argument("--tensorboard-update-freq", type=int, default=1)
 parser.add_argument("--disable-mixed-precision", action="store_false", dest="mixed_precision", help="Use mixed precision FP16")
+parser.add_argument("--seed", type=int, help="Set random seed")
 parser.add_argument("--device", type=str, default="CPU", help="device to use (TPU or GPU or CPU)")
 # fmt: on
 
@@ -36,6 +37,10 @@ if __name__ == "__main__":
         policy = tf.keras.mixed_precision.experimental.Policy("mixed_float16")
         tf.keras.mixed_precision.experimental.set_policy(policy)
         logger.info("Use Mixed Precision FP16")
+
+    if args.seed:
+        set_random_seed(args.seed)
+        logger.info(f"Set random seed to {args.seed}")
 
     # Copy config file
     tf.io.gfile.makedirs(args.output_path)

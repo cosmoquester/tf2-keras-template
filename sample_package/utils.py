@@ -1,8 +1,10 @@
 import logging
 import os
+import random
 import sys
 from typing import Callable, Iterable
 
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import backend as K
 
@@ -32,6 +34,13 @@ def path_join(*paths: Iterable[str]) -> str:
     if paths[0].startswith("gs://"):
         return "/".join((path.strip("/") for path in paths))
     return os.path.join(*paths)
+
+
+def set_random_seed(seed: int):
+    """ Set random seed for random / numpy / tensorflow """
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
 
 
 def get_device_strategy(device) -> tf.distribute.Strategy:
