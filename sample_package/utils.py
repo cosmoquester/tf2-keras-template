@@ -9,12 +9,12 @@ import tensorflow as tf
 from tensorflow.keras import backend as K
 
 
-def learning_rate_scheduler(num_epochs: int, max_learning_rate: float, min_learninga_rate: float = 1e-7) -> Callable:
+def learning_rate_scheduler(total_loop: int, max_learning_rate: float, min_learninga_rate: float = 1e-7) -> Callable:
     """ Schedule learning rate linearly from max_learning_rate to min_learninga_rate. """
-    lr_delta = (max_learning_rate - min_learninga_rate) / num_epochs
+    lr_delta = (max_learning_rate - min_learninga_rate) / total_loop
 
-    def _scheduler(epoch: int, lr: float) -> float:
-        return max_learning_rate - lr_delta * epoch
+    def _scheduler(loop_index: int, lr: float = 0.0) -> float:
+        return max_learning_rate - lr_delta * loop_index
 
     return _scheduler
 
