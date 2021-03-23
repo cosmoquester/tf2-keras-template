@@ -37,11 +37,6 @@ if __name__ == "__main__":
 
     logger = get_logger()
 
-    if args.mixed_precision:
-        policy = tf.keras.mixed_precision.experimental.Policy("mixed_float16")
-        tf.keras.mixed_precision.experimental.set_policy(policy)
-        logger.info("Use Mixed Precision FP16")
-
     if args.seed:
         set_random_seed(args.seed)
         logger.info(f"Set random seed to {args.seed}")
@@ -53,13 +48,19 @@ if __name__ == "__main__":
             fout.write(f"{k}: {v}\n")
     tf.io.gfile.copy(args.model_config_path, path_join(args.output_path, "model_config.json"))
 
-    # Construct Dataset
-    dataset_files = tf.io.gfile.glob(args.dataset_path)
-    if not dataset_files:
-        logger.error("[Error] Dataset path is invalid!")
-        sys.exit(1)
-
     with get_device_strategy(args.device).scope():
+        if args.mixed_precision:
+            mixed_type = "mixed_bfloat16" if args.device == "TPU" else "mixed_float16"
+            policy = tf.keras.mixed_precision.experimental.Policy(mixed_type)
+            tf.keras.mixed_precision.experimental.set_policy(policy)
+            logger.info("Use Mixed Precision FP16")
+
+        # Construct Dataset
+        dataset_files = tf.io.gfile.glob(args.dataset_path)
+        if not dataset_files:
+            logger.error("[Error] Dataset path is invalid!")
+            sys.exit(1)
+
         dataset = get_dataset(dataset_files).shuffle(args.shuffle_buffer_size)
         train_dataset = dataset.skip(args.num_dev_dataset).batch(args.batch_size)
         dev_dataset = dataset.take(args.num_dev_dataset).batch(max(args.batch_size, args.dev_batch_size))

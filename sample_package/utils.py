@@ -2,7 +2,7 @@ import logging
 import os
 import random
 import sys
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, Union
 
 import numpy as np
 import tensorflow as tf
@@ -25,9 +25,9 @@ class LRScheduler(tf.keras.optimizers.schedules.LearningRateSchedule):
         self.decreasing_delta = (max_learning_rate - min_learning_rate) / (total_steps - self.warmup_steps)
         self.max_learning_rate = tf.cast(max_learning_rate, tf.float32)
         self.min_learning_rate = tf.cast(min_learning_rate, tf.float32)
-        self.total_steps = total_steps
 
-    def __call__(self, step: tf.Tensor) -> tf.Tensor:
+    def __call__(self, step: Union[int, tf.Tensor]) -> tf.Tensor:
+        step = tf.cast(step, tf.float32)
         lr = tf.reduce_min([step * self.increasing_delta, self.max_learning_rate - step * self.decreasing_delta])
         return tf.reduce_max([lr, self.min_learning_rate])
 
