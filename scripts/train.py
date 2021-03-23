@@ -1,12 +1,13 @@
 import argparse
 import json
 import sys
+from math import ceil
 
 import tensorflow as tf
 
 from sample_package.data import get_dataset
 from sample_package.model import SampleModel
-from sample_package.utils import get_device_strategy, get_logger, learning_rate_scheduler, path_join, set_random_seed
+from sample_package.utils import LRScheduler, get_device_strategy, get_logger, path_join, set_random_seed
 
 # fmt: off
 parser = argparse.ArgumentParser()
@@ -18,9 +19,12 @@ parser.add_argument("--output-path", default="output", help="output directory to
 parser.add_argument("--epochs", type=int, default=10)
 parser.add_argument("--steps-per-epoch", type=int, default=None)
 parser.add_argument("--learning-rate", type=float, default=2e-3)
-parser.add_argument("--min-learning-rate", type=float, default=1e-8)
+parser.add_argument("--min-learning-rate", type=float, default=1e-5)
+parser.add_argument("--warmup-rate", type=float, default=0.06)
+parser.add_argument("--warmup-steps", type=int)
 parser.add_argument("--batch-size", type=int, default=2)
 parser.add_argument("--dev-batch-size", type=int, default=2)
+parser.add_argument("--total-dataset-size", type=int, default=1000)
 parser.add_argument("--num-dev-dataset", type=int, default=2)
 parser.add_argument("--tensorboard-update-freq", type=int, default=1)
 parser.add_argument("--disable-mixed-precision", action="store_false", dest="mixed_precision", help="Use mixed precision FP16")
@@ -74,8 +78,13 @@ if __name__ == "__main__":
             logger.info("Loaded weights of model")
 
         # Model Compile
+        total_steps = ceil((args.total_dataset_size - args.num_dev_dataset) / args.batch_size) * args.epochs
         model.compile(
-            optimizer=tf.optimizers.Adam(args.learning_rate),
+            optimizer=tf.optimizers.Adam(
+                LRScheduler(
+                    total_steps, args.learning_rate, args.min_learning_rate, args.warmup_rate, args.warmup_steps
+                )
+            ),
             loss=tf.keras.losses.BinaryCrossentropy(),
             metrics=[tf.keras.metrics.BinaryAccuracy()],
         )
@@ -100,9 +109,6 @@ if __name__ == "__main__":
                 ),
                 tf.keras.callbacks.TensorBoard(
                     path_join(args.output_path, "logs"), update_freq=args.tensorboard_update_freq
-                ),
-                tf.keras.callbacks.LearningRateScheduler(
-                    learning_rate_scheduler(args.epochs, args.learning_rate, args.min_learning_rate), verbose=1
                 ),
             ],
         )
