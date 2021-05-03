@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from sample_package.data import get_dataset
 from sample_package.model import SampleModel
-from sample_package.utils import get_device_strategy, get_logger, learning_rate_scheduler, path_join
+from sample_package.utils import get_device_strategy, get_logger, path_join
 
 # fmt: off
 parser = argparse.ArgumentParser()
@@ -81,7 +81,6 @@ if __name__ == "__main__":
             total_step = None
             learning_rate = args.learning_rate
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        accuracy = tf.keras.metrics.BinaryAccuracy()
         logger.info("Set optimizer and loss")
         logger.info("Start training")
 
