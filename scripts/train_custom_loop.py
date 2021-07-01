@@ -32,7 +32,7 @@ parser.add_argument("--device", type=str, default="CPU", help="device to use (TP
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    logger = get_logger()
+    logger = get_logger(__name__)
 
     if args.mixed_precision:
         policy = tf.keras.mixed_precision.experimental.Policy("mixed_float16")
