@@ -29,6 +29,7 @@ parser.add_argument("--num-dev-dataset", type=int, default=2)
 parser.add_argument("--tensorboard-update-freq", type=int, default=1)
 parser.add_argument("--disable-mixed-precision", action="store_false", dest="mixed_precision", help="Use mixed precision FP16")
 parser.add_argument("--seed", type=int, help="Set random seed")
+parser.add_argument("--skip-epochs", type=int, default=0, help="skip this number of epochs")
 parser.add_argument("--device", type=str, default="CPU", help="device to use (TPU or GPU or CPU)")
 # fmt: on
 
@@ -69,6 +70,12 @@ if __name__ == "__main__":
             train_dataset = train_dataset.repeat()
             logger.info("Repeat dataset")
 
+            if args.skip_epochs:
+                logger.info(
+                    f"[+] Skip examples by {args.skip_epochs}epoch x {args.steps_per_epoch} steps x {args.batch_size} batches"
+                )
+                train_dataset = train_dataset.skip(args.skip_epochs * args.steps_per_epoch * args.batch_size)
+
         # Model Initialize
         with tf.io.gfile.GFile(args.model_config_path) as f:
             model = SampleModel(**json.load(f))
@@ -79,11 +86,18 @@ if __name__ == "__main__":
             logger.info("Loaded weights of model")
 
         # Model Compile
-        total_steps = ceil((args.total_dataset_size - args.num_dev_dataset) / args.batch_size) * args.epochs
+        train_dataset_size = args.total_dataset_size - args.num_dev_dataset
+        total_steps = (args.steps_per_epoch or ceil(train_dataset_size / args.batch_size)) * args.epochs
+        offset_steps = (args.steps_per_epoch or ceil(train_dataset_size / args.batch_size)) * args.skip_epochs
         model.compile(
             optimizer=tf.optimizers.Adam(
                 LRScheduler(
-                    total_steps, args.learning_rate, args.min_learning_rate, args.warmup_rate, args.warmup_steps
+                    total_steps,
+                    args.learning_rate,
+                    args.min_learning_rate,
+                    args.warmup_rate,
+                    args.warmup_steps,
+                    offset_steps,
                 )
             ),
             loss=tf.keras.losses.BinaryCrossentropy(),
@@ -96,6 +110,7 @@ if __name__ == "__main__":
         model.fit(
             train_dataset,
             validation_data=dev_dataset,
+            initial_epoch=args.skip_epochs,
             epochs=args.epochs,
             steps_per_epoch=args.steps_per_epoch,
             callbacks=[
